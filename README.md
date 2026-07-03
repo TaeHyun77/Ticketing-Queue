@@ -12,17 +12,15 @@ https://velog.io/@ayeah77/series/%EB%8C%80%EA%B8%B0%EC%97%B4-%EC%8B%9C%EC%8A%A4%
 
 ---
 
-Backend : SpringBoot, Spring WebFlux, Kotlin, Coroutine
+Backend : Spring WebFlux, Kotlin, Coroutine
 
-Frontend : React.js, JavaScript
+Frontend : React, JavaScript
 
-Database : Redis (Sentinel)
+Cache : Redis
 
-Infra : Docker
+Infra : Docker, Redis Sentinel, ~~Kafka~~
 
-Etc : SSE, Redis pub/sub
-
-검토 후 제거 : Apache Kafka (도입·제거 과정 참고)<br><br>
+ETC : SSE, Redis pub/sub, Prometheus, Grafana, k6<br><br>
 
 ### 아키텍처
 
