@@ -37,22 +37,22 @@ class QueueService(
         private val objectMapper: ObjectMapper
 ) : Loggable {
 
-    // 대기열 등록, 신규 대기열 삽입 시 seq를 함께 반환 (X-Queue-Seq 헤더 노출용)
+    // 대기열 등록, wait/allow 진입 여부를 enum으로 반환
     suspend fun registerUserToWaitQueue(
             queueType: String,
             userId: String
-    ): Pair<RegisterResult, Long?> {
-        val (code, seq) = queueSchedulerService.enqueueOrAllow(queueType, userId)
+    ): RegisterResult {
+        val code = queueSchedulerService.enqueueOrAllow(queueType, userId)
 
         return when (code) {
-            -1L, -2L -> RegisterResult.ALREADY_EXISTS to null
+            -1L, -2L -> RegisterResult.ALREADY_EXISTS
             0L -> {
                 queueScheduler.addActiveQueue(queueType)
-                RegisterResult.REGISTERED to seq
+                RegisterResult.REGISTERED_WAIT
             }
             else -> {
                 queueScheduler.addActiveQueue(queueType)
-                RegisterResult.REGISTERED to null
+                RegisterResult.REGISTERED_ALLOW
             }
         }
     }

@@ -14,12 +14,14 @@ import org.springframework.core.io.ClassPathResource
 import org.springframework.data.redis.core.ReactiveRedisTemplate
 import org.springframework.data.redis.core.script.RedisScript
 import org.springframework.stereotype.Service
-import java.time.Duration
 
 @Service
 class QueueSchedulerService(
         @Value("\${queue.allow.max-capacity}")
         private val maxCapacity: Long,
+
+        @Value("\${queue.allow.token-ttl-ms}")
+        private val tokenTtlMs: Long,
 
         private val reactiveRedisTemplate: ReactiveRedisTemplate<String, String>,
         private val redisPublisher: RedisPublisher,
@@ -27,10 +29,10 @@ class QueueSchedulerService(
 ) : Loggable {
 
     companion object {
-        // Consumer용 : 중복 체크 + score 생성 + 참가열/대기열 삽입을 원자적으로 수행, {result, seq} 반환
-        private val ENQUEUE_OR_ALLOW_SCRIPT: RedisScript<List<*>> = RedisScript.of(
+        // Consumer용 : 중복 체크 + score 생성 + 참가열/대기열 삽입을 원자적으로 수행, 단일 정수 반환
+        private val ENQUEUE_OR_ALLOW_SCRIPT: RedisScript<Long> = RedisScript.of(
                 ClassPathResource("scripts/enqueue-or-allow.lua"),
-                List::class.java
+                Long::class.java
         )
 
         // 스케줄러용 : 만료 정리 + 빈 자리 계산 + 승격을 원자적으로 수행 ( JSON 문자열 반환 )
@@ -48,14 +50,10 @@ class QueueSchedulerService(
         const val EVENT_PROMOTE = "promote"
     }
 
-    private data class PromoteResult(val count: Long, val ids: List<String>)
-
-    data class EnqueueResult(val code: Long, val seq: Long)
-
     // 스케줄러 : 만료 정리 + 빈 자리 계산 + 승격을 원자적으로 처리
     suspend fun promoteUsers(queueType: String): Long {
         val nowMs = System.currentTimeMillis()
-        val expireAt = nowMs + Duration.ofMinutes(10).toMillis()
+        val expireAt = nowMs + tokenTtlMs
 
         val keys = listOf(
                 "$queueType$ALLOW_QUEUE",   // KEYS[1] : 참가열 키
@@ -90,15 +88,14 @@ class QueueSchedulerService(
 
     /**
      * 중복 체크 + score 생성 + 대기열/참가열 삽입을 원자적으로 처리
-     * code: -1 (대기열 존재), -2 (참가열 존재), 1 (참가열 삽입), 0 (대기열 삽입)
-     * seq : 대기열 신규 삽입(code=0)일 때만 > 0, 그 외 0
+     * 반환: -1 (대기열 존재), -2 (참가열 존재), 0 (대기열 삽입), 1 (참가열 삽입)
      */
     suspend fun enqueueOrAllow(
             queueType: String,
             userId: String
-    ): EnqueueResult {
+    ): Long {
         val nowMs = System.currentTimeMillis()
-        val expireAt = nowMs + Duration.ofMinutes(10).toMillis()
+        val expireAt = nowMs + tokenTtlMs
 
         val keys = listOf(
                 "$queueType$ALLOW_QUEUE",       // KEYS[1] : 참가열 키
@@ -113,13 +110,9 @@ class QueueSchedulerService(
                 expireAt.toString()             // ARGV[4] : 참가열 score
         )
 
-        val raw = reactiveRedisTemplate.execute(ENQUEUE_OR_ALLOW_SCRIPT, keys, args)
+        return reactiveRedisTemplate.execute(ENQUEUE_OR_ALLOW_SCRIPT, keys, args)
                 .next()
                 .awaitSingle()
-
-        val code = (raw[0] as Number).toLong()
-        val seq = (raw[1] as Number).toLong()
-        return EnqueueResult(code, seq)
     }
 
     // 취소 원자적 처리 : wait → allow 순서로 ZREM, 어느 쪽에서 제거됐는지 반환
@@ -136,4 +129,6 @@ class QueueSchedulerService(
                 .next()
                 .awaitSingle()
     }
+
+    private data class PromoteResult(val count: Long, val ids: List<String>)
 }
