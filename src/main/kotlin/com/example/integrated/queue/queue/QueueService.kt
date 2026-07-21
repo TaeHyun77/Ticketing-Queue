@@ -2,7 +2,6 @@ package com.example.integrated.queue.queue
 
 import com.example.integrated.queue.queue.dto.QueueChangePayload
 import com.example.integrated.queue.queue.dto.RegisterResult
-import com.example.integrated.queue.queue.scheduler.QueueScheduler
 import com.example.integrated.queue.queue.scheduler.QueueSchedulerService
 import com.example.integrated.redis.pubsub.RedisPublisher
 import com.example.integrated.reserveException.ErrorCode
@@ -31,29 +30,23 @@ class QueueService(
         private val validationKey: String,
 
         private val queueSchedulerService: QueueSchedulerService,
-        private val queueScheduler: QueueScheduler,
         private val redisPublisher: RedisPublisher,
         private val reactiveRedisTemplate: ReactiveRedisTemplate<String, String>,
         private val objectMapper: ObjectMapper
 ) : Loggable {
 
-    // 대기열 등록, 신규 대기열 삽입 시 seq를 함께 반환 (X-Queue-Seq 헤더 노출용)
+    // 대기열 등록, wait/allow 진입 여부를 enum으로 반환
     suspend fun registerUserToWaitQueue(
             queueType: String,
             userId: String
-    ): Pair<RegisterResult, Long?> {
-        val (code, seq) = queueSchedulerService.enqueueOrAllow(queueType, userId)
+    ): RegisterResult {
+        val code = queueSchedulerService.enqueueOrAllow(queueType, userId)
 
+        // 활성 큐 레지스트리 등록(SADD)은 enqueue-or-allow.lua 내부에서 원자적으로 처리된다.
         return when (code) {
-            -1L, -2L -> RegisterResult.ALREADY_EXISTS to null
-            0L -> {
-                queueScheduler.addActiveQueue(queueType)
-                RegisterResult.REGISTERED to seq
-            }
-            else -> {
-                queueScheduler.addActiveQueue(queueType)
-                RegisterResult.REGISTERED to null
-            }
+            -1L, -2L -> RegisterResult.ALREADY_EXISTS
+            0L -> RegisterResult.REGISTERED_WAIT
+            else -> RegisterResult.REGISTERED_ALLOW
         }
     }
 
