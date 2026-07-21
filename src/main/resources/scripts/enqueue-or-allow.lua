@@ -3,11 +3,13 @@
 -- KEYS[1] : 참가열 키 (ZSet)
 -- KEYS[2] : 대기열 키 (ZSet)
 -- KEYS[3] : 시퀀스 카운터 키 (queue:seq:{queueType}, 영구 보존)
+-- KEYS[4] : 활성 큐 레지스트리 키 (active-allow-queue, Set)
 
 -- ARGV[1] : userId
 -- ARGV[2] : 참가열 최대 수용 인원 (maxCapacity)
 -- ARGV[3] : 현재 시각 밀리초 (참가열 만료 정리용)
 -- ARGV[4] : 참가열 score (expireAt)
+-- ARGV[5] : queueType (레지스트리 멤버)
 
 -- 반환 값: 단일 정수
 --   -1 : 대기열 중복
@@ -18,11 +20,13 @@
 local allowKey = KEYS[1]
 local waitKey = KEYS[2]
 local seqKey = KEYS[3]
+local activeKey = KEYS[4]
 
 local userId = ARGV[1]
 local maxCapacity = tonumber(ARGV[2])
 local nowMs = tonumber(ARGV[3])
 local expireAt = tonumber(ARGV[4])
+local queueType = ARGV[5]
 
 -- 1. 대기열에 이미 존재하는지 확인
 if redis.call('ZSCORE', waitKey, userId) then
@@ -44,6 +48,8 @@ local waitCount = redis.call('ZCARD', waitKey)
 --    (여기서 신규 유저를 직행시키면 먼저 온 대기자를 추월 → 선착순 위반)
 if currentCount < maxCapacity and waitCount == 0 then
     redis.call('ZADD', allowKey, expireAt, userId)
+    -- 이 큐에 상태(allow)가 생겼으므로 스케줄링 대상으로 등록
+    redis.call('SADD', activeKey, queueType)
     return 1
 end
 
@@ -51,5 +57,7 @@ end
 --    빈자리는 다음 스케줄러 틱의 ZPOPMIN(선두)이 FIFO 순서대로 채운다.
 local seq = redis.call('INCR', seqKey)
 redis.call('ZADD', waitKey, seq, userId)
+-- 이 큐에 대기자가 생겼으므로 스케줄링 대상으로 등록
+redis.call('SADD', activeKey, queueType)
 
 return 0

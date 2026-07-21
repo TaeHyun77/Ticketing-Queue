@@ -2,6 +2,7 @@ package com.example.integrated.queue.queue.scheduler
 
 import com.example.integrated.queue.queue.dto.QueueChangePayload
 import com.example.integrated.redis.pubsub.RedisPublisher
+import com.example.integrated.util.ACTIVE_QUEUE_KEY
 import com.example.integrated.util.ALLOW_QUEUE
 import com.example.integrated.util.CHANNEL_NAME
 import com.example.integrated.util.WAIT_QUEUE
@@ -57,13 +58,15 @@ class QueueSchedulerService(
 
         val keys = listOf(
                 "$queueType$ALLOW_QUEUE",   // KEYS[1] : 참가열 키
-                "$queueType$WAIT_QUEUE"     // KEYS[2] : 대기열 키
+                "$queueType$WAIT_QUEUE",    // KEYS[2] : 대기열 키
+                ACTIVE_QUEUE_KEY            // KEYS[3] : 활성 큐 레지스트리
         )
 
         val args = listOf(
                 maxCapacity.toString(),     // ARGV[1] : 참가열 최대 수용 인원
                 nowMs.toString(),           // ARGV[2] : 현재 시각 ( 만료 판단 )
-                expireAt.toString()         // ARGV[3] : 참가열 score
+                expireAt.toString(),        // ARGV[3] : 참가열 score
+                queueType                   // ARGV[4] : 레지스트리 멤버
         )
 
         val raw = reactiveRedisTemplate.execute(SCHEDULE_PROMOTE_SCRIPT, keys, args)
@@ -100,14 +103,16 @@ class QueueSchedulerService(
         val keys = listOf(
                 "$queueType$ALLOW_QUEUE",       // KEYS[1] : 참가열 키
                 "$queueType$WAIT_QUEUE",        // KEYS[2] : 대기열 키
-                "queue:seq:$queueType"          // KEYS[3] : 이벤트별 시퀀스 카운터 키 ( score 생성용 )
+                "queue:seq:$queueType",         // KEYS[3] : 이벤트별 시퀀스 카운터 키 ( score 생성용 )
+                ACTIVE_QUEUE_KEY                // KEYS[4] : 활성 큐 레지스트리
         )
 
         val args = listOf(
                 userId,                         // ARGV[1] : userId
                 maxCapacity.toString(),         // ARGV[2] : 참가열 최대 수용 인원
                 nowMs.toString(),               // ARGV[3] : 현재 시각
-                expireAt.toString()             // ARGV[4] : 참가열 score
+                expireAt.toString(),            // ARGV[4] : 참가열 score
+                queueType                       // ARGV[5] : 레지스트리 멤버
         )
 
         return reactiveRedisTemplate.execute(ENQUEUE_OR_ALLOW_SCRIPT, keys, args)
@@ -120,10 +125,11 @@ class QueueSchedulerService(
     suspend fun cancelUser(queueType: String, userId: String): String {
         val keys = listOf(
                 "$queueType$WAIT_QUEUE",    // KEYS[1] : 대기열 키
-                "$queueType$ALLOW_QUEUE"    // KEYS[2] : 참가열 키
+                "$queueType$ALLOW_QUEUE",   // KEYS[2] : 참가열 키
+                ACTIVE_QUEUE_KEY           // KEYS[3] : 활성 큐 레지스트리
         )
 
-        val args = listOf(userId)           // ARGV[1] : userId
+        val args = listOf(userId, queueType)   // ARGV[1] : userId, ARGV[2] : 레지스트리 멤버
 
         return reactiveRedisTemplate.execute(CANCEL_USER_SCRIPT, keys, args)
                 .next()

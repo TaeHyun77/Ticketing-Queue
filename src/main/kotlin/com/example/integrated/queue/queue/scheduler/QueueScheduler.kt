@@ -4,7 +4,6 @@ import com.example.integrated.redis.RedisLockUtil
 import com.example.integrated.util.ACTIVE_QUEUE_KEY
 import com.example.integrated.util.Loggable
 import com.example.integrated.util.SCHEDULING_KEY
-import kotlinx.coroutines.reactor.awaitSingle
 import kotlinx.coroutines.reactor.awaitSingleOrNull
 import org.springframework.data.redis.core.ReactiveRedisTemplate
 import org.springframework.scheduling.annotation.Scheduled
@@ -48,11 +47,5 @@ class QueueScheduler(
                 .collectList()
                 .awaitSingleOrNull()
                 ?: emptyList()
-    }
-
-    suspend fun addActiveQueue(queueType: String) {
-        reactiveRedisTemplate.opsForSet()
-                .add(ACTIVE_QUEUE_KEY, queueType)
-                .awaitSingle()
     }
 }
