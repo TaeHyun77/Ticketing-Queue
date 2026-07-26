@@ -10,13 +10,13 @@ Lua 스크립트는 Redis EVAL로 원자적으로 실행된다. 수정 시 원�
 ## 반환 값 규약
 
 ### enqueue-or-allow.lua
-- 반환: `{result, seq}` 배열
-  - `result = -1`: 대기열 중복 (이미 대기열에 존재), `seq = 0`
-  - `result = -2`: 참가열 중복 (이미 참가열에 존재), `seq = 0`
-  - `result =  0`: 대기열 신규 삽입 성공, `seq > 0` (대기열 score 그대로)
-  - `result =  1`: 참가열 직접 삽입 성공 (여유 있을 때), `seq = 0`
+- 반환: 단일 정수
+  - `-1`: 대기열 중복 (이미 대기열에 존재)
+  - `-2`: 참가열 중복 (이미 참가열에 존재)
+  - ` 0`: 대기열 신규 삽입 성공
+  - ` 1`: 참가열 직접 삽입 성공 (여유 있을 때)
 
-이 반환 값은 `QueueSchedulerService.enqueueOrAllow()`가 `EnqueueResult(code, seq)`로 받아 `QueueService.registerUserToWaitQueue()`의 `when` 분기에서 사용된다. `result = 0`일 때의 `seq`는 `X-Queue-Seq` 응답 헤더로 클라이언트에 노출된다. 반환 값을 변경하면 반드시 호출부도 함께 수정한다.
+이 반환 값은 `QueueSchedulerService.enqueueOrAllow()`가 `Long`으로 받아 `QueueService.registerUserToWaitQueue()`의 `when` 분기에서 `RegisterResult.REGISTERED_WAIT` / `REGISTERED_ALLOW` / `ALREADY_EXISTS`로 매핑된다. 반환 값을 변경하면 반드시 호출부도 함께 수정한다. 대기열 신규 삽입 시 score로 사용되는 `INCR seq` 값은 내부 score 계산용일 뿐 외부에 노출하지 않는다.
 
 ### schedule-promote.lua
 - 반환 값: 승격된 사용자 수 (Long)

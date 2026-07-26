@@ -1,8 +1,6 @@
 version: "2.4"
 
 services:
-
-  # --- 대기열 프로젝트 ---
   queueing-back-1:
     build: .
     image: local/queueing:latest
