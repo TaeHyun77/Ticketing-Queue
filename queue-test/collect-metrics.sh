@@ -11,7 +11,9 @@ RUN_DIR="$1"
 MODE="$2"
 
 REDIS="queue-redis-master"
-APP="queueing01"
+# 실행 중인 queueing 컨테이너를 자동 감지(1node/3node 공용) — 앱별 CPU 분산 수집용
+APPS=$(docker ps --format '{{.Names}}' 2>/dev/null | grep -E '^queueing0[0-9]$' | sort | tr '\n' ' ')
+[ -z "$APPS" ] && APPS="queueing01"
 
 if [ -z "$RUN_DIR" ] || [ -z "$MODE" ]; then
     echo "Usage: $0 <RUN_DIR> {start|dump}"
@@ -29,7 +31,7 @@ case "$MODE" in
             TS=$(date +%s)
             docker stats --no-stream \
                 --format '{{.Name}},{{.CPUPerc}},{{.MemUsage}},{{.MemPerc}},{{.NetIO}},{{.BlockIO}}' \
-                "$APP" "$REDIS" 2>/dev/null | \
+                $APPS "$REDIS" 2>/dev/null | \
                 while IFS=',' read -r name cpu mem memp net block; do
                     echo "$TS,$name,$cpu,\"$mem\",$memp,\"$net\",\"$block\"" >> "$STATS_FILE"
                 done

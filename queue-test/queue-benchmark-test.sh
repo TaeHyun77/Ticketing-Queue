@@ -25,14 +25,14 @@
 
 set -eo pipefail
 
-# ---- 설정 ----
+# ---- 설정 (환경변수로 override 가능, 기본값은 정밀 측정용) ----
 RPS_LEVELS=(${1:-50 100 200 300 500 700 1000})
-DURATION=60
-WARMUP_DURATION=60
-STABILIZE_WAIT=60
-COOLDOWN_WAIT=60
-RUNS=3
-RESET_WAIT=2
+DURATION=${DURATION:-60}
+WARMUP_DURATION=${WARMUP_DURATION:-60}
+STABILIZE_WAIT=${STABILIZE_WAIT:-60}
+COOLDOWN_WAIT=${COOLDOWN_WAIT:-60}
+RUNS=${RUNS:-3}
+RESET_WAIT=${RESET_WAIT:-2}
 
 REDIS="queue-redis-master"
 QUEUE="concert"
@@ -40,18 +40,18 @@ QUEUE="concert"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 RESULT_BASE="$PROJECT_DIR/results"
+# 결과 파일 접두어(1node/3node 등). 환경만 바꿔 비교 시 결과가 덮어써지지 않도록 분리.
+LABEL="${LABEL:-1node}"
 mkdir -p "$RESULT_BASE"
 
 COLLECT="$SCRIPT_DIR/collect-metrics.sh"
 LOAD_TEST="$SCRIPT_DIR/queue-load-test.js"
 
-# ---- 헬퍼: 3개 값 중앙값 ----
+# ---- 헬퍼: 중앙값 (빈 회차 슬롯 제외, RUNS 개수 무관) ----
+#   RUNS=1 일 때 미설정 슬롯(빈 문자열)을 0으로 세면 중앙값이 0으로 왜곡되므로 빈 값은 제외한다.
 median3() {
-    awk -v a="${1:-0}" -v b="${2:-0}" -v c="${3:-0}" 'BEGIN {
-        n[0]=a; n[1]=b; n[2]=c
-        for (i=0;i<3;i++) for (j=i+1;j<3;j++) if (n[i]+0>n[j]+0) { t=n[i]; n[i]=n[j]; n[j]=t }
-        printf "%s", n[1]
-    }'
+    printf '%s\n' "$@" | awk 'NF' | sort -n | \
+        awk '{ a[NR]=$0 } END { if (NR==0) print 0; else print a[int((NR+1)/2)] }'
 }
 
 echo ""
@@ -75,7 +75,7 @@ for RATE in "${RPS_LEVELS[@]}"; do
 
     for ((run=0; run<RUNS; run++)); do
         RUN_NUM=$((run + 1))
-        RUN_DIR="$RESULT_BASE/1node_rps${RATE}_run${RUN_NUM}"
+        RUN_DIR="$RESULT_BASE/${LABEL}_rps${RATE}_run${RUN_NUM}"
         mkdir -p "$RUN_DIR"
 
         echo ""
@@ -83,7 +83,7 @@ for RATE in "${RPS_LEVELS[@]}"; do
 
         # 워밍업
         echo "      [warmup]    ${WARMUP_RATE} RPS × ${WARMUP_DURATION}s"
-        GOMAXPROCS=2 K6_RATE=$WARMUP_RATE K6_DURATION=$WARMUP_DURATION K6_RESULT_FILE=/dev/null \
+        GOMAXPROCS=2 K6_RATE=$WARMUP_RATE K6_TEST_DURATION=$WARMUP_DURATION K6_RESULT_FILE=/dev/null \
             k6 run "$LOAD_TEST" > /dev/null 2>&1 || true
 
         # 안정화
@@ -105,7 +105,7 @@ for RATE in "${RPS_LEVELS[@]}"; do
 
         # 본 측정
         echo "      [measure]   ${RATE} RPS × ${DURATION}s"
-        GOMAXPROCS=2 K6_RATE=$RATE K6_DURATION=$DURATION K6_RESULT_FILE="$RUN_DIR/k6_result.txt" \
+        GOMAXPROCS=2 K6_RATE=$RATE K6_TEST_DURATION=$DURATION K6_RESULT_FILE="$RUN_DIR/k6_result.txt" \
             k6 run "$LOAD_TEST"
 
         # docker stats 종료
@@ -189,7 +189,7 @@ for RATE in "${RPS_LEVELS[@]}"; do
     fi
     THROUGHPUT=$(awk "BEGIN { if($MED_CONSUME>0) printf \"%.1f\", $MED_SUCCESS / $MED_CONSUME; else print \"0\" }")
 
-    SUMMARY_FILE="$RESULT_BASE/1node_rps${RATE}_median.txt"
+    SUMMARY_FILE="$RESULT_BASE/${LABEL}_rps${RATE}_median.txt"
     cat > "$SUMMARY_FILE" <<RESULT_EOF
 rps=$RATE
 runs=$RUNS
@@ -226,7 +226,7 @@ RECOMMENDED=""
 P95_THRESHOLD=500
 
 for RATE in "${RPS_LEVELS[@]}"; do
-    FILE="$RESULT_BASE/1node_rps${RATE}_median.txt"
+    FILE="$RESULT_BASE/${LABEL}_rps${RATE}_median.txt"
     if [ ! -f "$FILE" ]; then
         printf "  %-6s  %-8s  %-10s  %-10s  %-10s  %-10s  %-10s\n" \
                "$RATE" "N/A" "N/A" "N/A" "N/A" "N/A" "N/A"

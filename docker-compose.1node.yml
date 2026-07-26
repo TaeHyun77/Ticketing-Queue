@@ -1,18 +1,13 @@
 version: "2.4"
 
-# 단일 인스턴스 베이스라인 측정용 docker-compose
-#
-# 실행: docker compose -f docker-compose.1node.yml up
-#
-# base 파일과 별도 운영. reserve 서비스 제외, queueing 인스턴스 1개만 유지
-
 services:
   queueing-back-1:
     build: .
     image: local/queueing:latest
     container_name: queueing01
+    cpuset: "0,1"
     cpus: 2.0
-    mem_limit: 1g
+    mem_limit: 1.5g
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:9292/actuator/health || exit 1"]
       interval: 10s
@@ -33,12 +28,28 @@ services:
     networks:
       - integrated-net
 
+  nginx:
+    image: nginx:latest
+    container_name: integrated-nginx
+    cpuset: "7"
+    cpus: 1.0
+    ports:
+      - "8079:90"
+    volumes:
+      - ./nginx.1node.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      queueing-back-1:
+        condition: service_healthy
+    networks:
+      - integrated-net
+
   # --- Redis Master-Slave + Sentinel ---
   redis-master:
     image: "bitnami/redis:latest"
     hostname: redis-master
     container_name: queue-redis-master
-    cpus: 2.0
+    cpuset: "6"
+    cpus: 1.0
     mem_limit: 1g
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
@@ -57,6 +68,7 @@ services:
     image: "bitnami/redis:latest"
     hostname: redis-slave01
     container_name: queue-redis-slave01
+    cpuset: "6"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
@@ -78,6 +90,7 @@ services:
     image: "bitnami/redis:latest"
     hostname: redis-slave02
     container_name: queue-redis-slave02
+    cpuset: "6"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
@@ -99,6 +112,7 @@ services:
     image: 'bitnami/redis-sentinel:latest'
     hostname: redis-sentinel01
     container_name: queue-redis-sentinel01
+    cpuset: "6"
     healthcheck:
       test: ["CMD", "redis-cli", "-p", "26379", "ping"]
       interval: 5s
@@ -128,6 +142,7 @@ services:
     image: 'bitnami/redis-sentinel:latest'
     hostname: redis-sentinel02
     container_name: queue-redis-sentinel02
+    cpuset: "6"
     healthcheck:
       test: ["CMD", "redis-cli", "-p", "26379", "ping"]
       interval: 5s
@@ -157,6 +172,7 @@ services:
     image: 'bitnami/redis-sentinel:latest'
     hostname: redis-sentinel03
     container_name: queue-redis-sentinel03
+    cpuset: "6"
     healthcheck:
       test: ["CMD", "redis-cli", "-p", "26379", "ping"]
       interval: 5s
@@ -186,6 +202,7 @@ services:
   airdnb-prometheus:
     image: prom/prometheus:latest
     container_name: prometheus
+    cpuset: "7"
     volumes:
       - ./prometheus.1node.yml:/etc/prometheus/prometheus.yml
     ports:
@@ -198,6 +215,7 @@ services:
   airdnb-local-grafana:
     image: grafana/grafana:latest
     container_name: grafana
+    cpuset: "7"
     environment:
       - GF_SECURITY_ADMIN_USER=admin
       - GF_SECURITY_ADMIN_PASSWORD=admin

@@ -12,26 +12,29 @@
 //   K6_RATE=90  K6_DURATION=60 k6 run queue-load-test.js              (워밍업: 본 RPS의 30%)
 //
 // [ 환경 변수 ]
-//   K6_RATE        : 초당 요청 수 (기본값 300)
-//   K6_DURATION    : 테스트 지속 시간 초 (기본값 60)
+//   K6_RATE          : 초당 요청 수 (기본값 300)
+//   K6_TEST_DURATION : 테스트 지속 시간 초 (기본값 60) — K6_DURATION 은 k6 예약어라 사용 불가
 //   K6_RESULT_FILE : 결과 파일 경로 (기본값 'k6_result.txt')
-//   K6_TARGET_URL  : 등록 엔드포인트 URL (기본값 단일 서버 직접 접근 'http://localhost:8081/queue/register')
+//   K6_TARGET_URL  : 등록 엔드포인트 URL (기본값 nginx 경유 'http://localhost:8079/queue/register')
 
 import http from 'k6/http';
 import { check } from 'k6';
 import { Counter } from 'k6/metrics';
 
 var successCount = new Counter('success_count');     // 대기열 + 참가열 신규 진입 합계
-var waitCount    = new Counter('wait_count');        // 대기열 신규 진입 (X-Queue-Seq 헤더 동반)
-var allowCount   = new Counter('allow_count');       // 참가열 직접 삽입
+var waitCount    = new Counter('wait_count');        // 대기열 신규 진입 (REGISTERED_WAIT)
+var allowCount   = new Counter('allow_count');       // 참가열 직접 삽입 (REGISTERED_ALLOW)
 var duplicateCount = new Counter('duplicate_count');
 var failCount    = new Counter('fail_count');
 
 var RATE = parseInt(__ENV.K6_RATE || '300', 10);
-var DURATION = parseInt(__ENV.K6_DURATION || '60', 10);
+// K6_DURATION 은 k6 예약 env(네이티브 duration 옵션)라 시나리오를 덮어써 충돌 → K6_TEST_DURATION 사용
+var DURATION = parseInt(__ENV.K6_TEST_DURATION || '60', 10);
 var TOTAL_EXPECTED = RATE * DURATION;
 var RESULT_FILE = __ENV.K6_RESULT_FILE || 'k6_result.txt';
-var TARGET_URL = __ENV.K6_TARGET_URL || 'http://localhost:8081/queue/register';
+var TARGET_URL = __ENV.K6_TARGET_URL || 'http://localhost:8079/queue/register';
+// userId 네임스페이스 프리픽스. 정합성 테스트에서 phase별로 겹치지 않게 분리하는 용도.
+var UID_PREFIX = __ENV.K6_UID_PREFIX || 'user';
 
 export var options = {
     scenarios: {
@@ -40,8 +43,9 @@ export var options = {
             rate: RATE,
             timeUnit: '1s',
             duration: DURATION + 's',
-            preAllocatedVUs: Math.min(Math.ceil(RATE * 2), 2000),
-            maxVUs: Math.min(Math.ceil(RATE * 5), 5000),
+            // 무릎 탐색 상한(5,000 RPS)에서도 preAllocated ≥ RATE/2, maxVUs ≥ preAllocated×2 충족
+            preAllocatedVUs: Math.min(Math.ceil(RATE * 2), 3000),
+            maxVUs: Math.min(Math.ceil(RATE * 5), 10000),
             gracefulStop: '30s',
         },
     },
@@ -49,7 +53,7 @@ export var options = {
 };
 
 export default function () {
-    var uid = 'user-' + __VU + '-' + __ITER;
+    var uid = UID_PREFIX + '-' + __VU + '-' + __ITER;
     var payload = JSON.stringify({
         queueType: 'concert',
         userId: uid,
@@ -64,11 +68,10 @@ export default function () {
     var res = http.post(TARGET_URL, payload, params);
     var body = (res.body || '').replace(/"/g, '').trim();
 
-    if (res.status === 200 && body === 'REGISTERED') {
+    if (res.status === 200 && (body === 'REGISTERED_WAIT' || body === 'REGISTERED_ALLOW')) {
         successCount.add(1);
-        // X-Queue-Seq 헤더 유무로 대기열/참가열 구분 (헤더는 lowercase로 노출됨)
-        var seqHeader = res.headers['X-Queue-Seq'] || res.headers['x-queue-seq'];
-        if (seqHeader) {
+        // 응답 enum으로 대기열/참가열 구분
+        if (body === 'REGISTERED_WAIT') {
             waitCount.add(1);
         } else {
             allowCount.add(1);
