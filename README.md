@@ -4,7 +4,7 @@
 
 티켓팅처럼 짧은 시간에 수만 명이 몰리는 트래픽을 대기열로 제어하는 시스템입니다. Docker 기반 다중 인스턴스로 요청을 분산 처리하고, Redis Sentinel의 자동 페일오버로 Redis 장애 상황에서도 대기 순서가 끊기지 않도록 가용성을 확보했습니다.<br><br>
 
-**구현 과정 개인 블로그**
+[ 개인 블로그 ]
 
 https://velog.io/@ayeah77/series/%EB%8C%80%EA%B8%B0%EC%97%B4-%EC%8B%9C%EC%8A%A4%ED%85%9C-%EA%B0%9C%EC%84%A0<br><br>
 
