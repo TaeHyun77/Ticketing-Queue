@@ -26,7 +26,7 @@ ETC : SSE, Redis pub/sub, Prometheus, Grafana, k6<br><br>
 
 ---
 
-<img width="1000" height="300" alt="Image" src="https://github.com/user-attachments/assets/e6f0afaf-cfdf-4706-aca2-298d54e36106" />
+<img width="800" height="350" alt="Image" src="https://github.com/user-attachments/assets/2f839568-aca6-4df7-bd79-ae8b8c82c8a3" />
 
 Docker를 활용하여 분산 환경을 구성했으며, 각 애플리케이션 인스턴스는 시작 시 Redis Pub/Sub 채널을 구독하여 이벤트를 수신할 준비를 합니다.<br><br>
 
