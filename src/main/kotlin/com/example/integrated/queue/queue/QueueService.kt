@@ -1,6 +1,8 @@
 package com.example.integrated.queue.queue
 
 import com.example.integrated.queue.queue.dto.QueueChangePayload
+import com.example.integrated.queue.queue.dto.QueueStatus
+import com.example.integrated.queue.queue.dto.QueueStatusResponse
 import com.example.integrated.queue.queue.dto.RegisterResult
 import com.example.integrated.queue.queue.scheduler.QueueSchedulerService
 import com.example.integrated.redis.pubsub.RedisPublisher
@@ -60,6 +62,27 @@ class QueueService(
             .awaitFirstOrNull()
             ?.let { it + 1L }
             ?: -1L
+
+    /* 대기열/참가열 통합 상태 조회 ( 클라이언트 상태 재동기화용 )
+    * SSE 재접속 직후 현재 상태를 다시 맞추거나, failover 유실 시 클라이언트가
+    * NONE을 보고 재등록을 판단하는 데 사용한다.
+    * wait → allow 순서로 조회하므로 두 조회 사이에 승격되면 ALLOW로 판정된다.
+    * */
+    suspend fun getQueueStatus(
+        queueType: String,
+        userId: String
+    ): QueueStatusResponse {
+        val rank = getWaitQueueRank(queueType, userId)
+        if (rank > 0) {
+            return QueueStatusResponse(QueueStatus.WAIT, rank)
+        }
+
+        if (!isAllowTokenExpired(queueType, userId)) {
+            return QueueStatusResponse(QueueStatus.ALLOW)
+        }
+
+        return QueueStatusResponse(QueueStatus.NONE)
+    }
 
     /* Lua로 wait/allow에서 원자적으로 제거 ( race 문제 해결을 위함 )
     * wait/allow : publish 발행 → 본인 SSE에 'cancelled' 전달

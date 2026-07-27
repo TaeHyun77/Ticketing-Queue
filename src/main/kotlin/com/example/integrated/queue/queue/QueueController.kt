@@ -1,6 +1,7 @@
 package com.example.integrated.queue.queue
 
 import com.example.integrated.queue.queue.dto.QueueRequest
+import com.example.integrated.queue.queue.dto.QueueStatusResponse
 import com.example.integrated.queue.queue.dto.RegisterResult
 import com.example.integrated.util.Loggable
 import org.springframework.beans.factory.annotation.Value
@@ -35,6 +36,13 @@ class QueueController (
         @RequestParam queueType: String,
         @RequestParam userId: String,
     ): Long = queueService.getWaitQueueRank(queueType, userId)
+
+    // 대기열/참가열 통합 상태 조회 ( SSE 재접속·유실 복구 시 클라이언트 재동기화용 )
+    @GetMapping("/get/status")
+    suspend fun getUserStatus(
+        @RequestParam queueType: String,
+        @RequestParam userId: String,
+    ): QueueStatusResponse = queueService.getQueueStatus(queueType, userId)
 
     // 쿠키에 토큰 전달
     @GetMapping("/create/cookie")

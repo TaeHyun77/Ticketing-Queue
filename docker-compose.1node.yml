@@ -59,8 +59,13 @@ services:
     environment:
       - REDIS_REPLICATION_MODE=master
       - ALLOW_EMPTY_PASSWORD=yes
+      # 정상 복제본이 1개 미만이면 쓰기를 거부하여 failover 유실 창을 복제 지연(최대 10초)으로 상한
+      - REDIS_EXTRA_FLAGS=--min-replicas-to-write 1 --min-replicas-max-lag 10
     ports:
       - "6379:6379"
+    volumes:
+      # AOF 영속화 (컨테이너 재생성 시에도 데이터 유지, 빈 마스터 재동기화로 인한 전체 유실 방지)
+      - redis-master-data:/bitnami/redis/data
     networks:
       - integrated-net
 
@@ -78,8 +83,12 @@ services:
       - REDIS_REPLICATION_MODE=slave
       - ALLOW_EMPTY_PASSWORD=yes
       - REDIS_MASTER_HOST=redis-master
+      # failover로 마스터 승격 시에도 동일한 쓰기 거부 정책을 유지하기 위해 slave에도 적용
+      - REDIS_EXTRA_FLAGS=--min-replicas-to-write 1 --min-replicas-max-lag 10
     ports:
       - "6479:6379"
+    volumes:
+      - redis-slave01-data:/bitnami/redis/data
     depends_on:
       redis-master:
         condition: service_healthy
@@ -100,8 +109,12 @@ services:
       - REDIS_REPLICATION_MODE=slave
       - ALLOW_EMPTY_PASSWORD=yes
       - REDIS_MASTER_HOST=redis-master
+      # failover로 마스터 승격 시에도 동일한 쓰기 거부 정책을 유지하기 위해 slave에도 적용
+      - REDIS_EXTRA_FLAGS=--min-replicas-to-write 1 --min-replicas-max-lag 10
     ports:
       - "6579:6379"
+    volumes:
+      - redis-slave02-data:/bitnami/redis/data
     depends_on:
       redis-master:
         condition: service_healthy
@@ -233,3 +246,6 @@ networks:
 
 volumes:
   grafana-data:
+  redis-master-data:
+  redis-slave01-data:
+  redis-slave02-data:
