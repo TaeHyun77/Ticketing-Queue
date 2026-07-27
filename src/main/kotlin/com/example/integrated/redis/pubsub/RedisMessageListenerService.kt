@@ -64,7 +64,10 @@ class RedisMessageListenerService(
                             log.warn { "Pub/Sub 메시지 파싱 실패: ${it.message}, raw=${message.message}" }
                         }
                     }
-                break
+                // 예외 없는 정상 완료도 구독 중단이므로 재구독한다 (break 시 알림 수신이 영구 중단됨)
+                val delayMs = 2000L * minOf(++attempt, 5)
+                log.warn { "Redis Pub/Sub 스트림 정상 종료 (시도: $attempt), ${delayMs}ms 후 재구독" }
+                delay(delayMs)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {

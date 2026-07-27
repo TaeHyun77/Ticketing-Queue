@@ -1,5 +1,8 @@
 FROM amazoncorretto:17 AS builder
 
+# 베이스 이미지에 xargs(findutils)가 없어 gradlew 실행이 실패하므로 설치
+RUN yum install -y findutils && yum clean all
+
 WORKDIR /app
 
 COPY gradlew .

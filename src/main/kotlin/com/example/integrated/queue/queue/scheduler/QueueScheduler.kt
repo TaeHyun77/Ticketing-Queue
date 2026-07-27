@@ -5,12 +5,17 @@ import com.example.integrated.util.ACTIVE_QUEUE_KEY
 import com.example.integrated.util.Loggable
 import com.example.integrated.util.SCHEDULING_KEY
 import kotlinx.coroutines.reactor.awaitSingleOrNull
+import org.springframework.beans.factory.annotation.Value
 import org.springframework.data.redis.core.ReactiveRedisTemplate
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Component
+import java.util.concurrent.TimeUnit
 
 @Component
 class QueueScheduler(
+        @Value("\${queue.scheduling.lock-lease-ms}")
+        private val lockLeaseMs: Long,
+
         private val queueSchedulerService: QueueSchedulerService,
         private val redisLockUtil: RedisLockUtil,
         private val reactiveRedisTemplate: ReactiveRedisTemplate<String, String>,
@@ -25,7 +30,7 @@ class QueueScheduler(
         val knownQueues = getKnownQueues()
         if (knownQueues.isEmpty()) return
 
-        redisLockUtil.acquireLockAndRun(SCHEDULING_KEY) {
+        redisLockUtil.acquireLockAndRun(SCHEDULING_KEY, leaseTime = lockLeaseMs, timeUnit = TimeUnit.MILLISECONDS) {
             knownQueues.forEach { queueType ->
                 try {
                     // Lua 스크립트 하나로 만료 정리 + 빈 자리 계산 + 승격을 원자적으로 처리
