@@ -9,6 +9,7 @@ import com.example.integrated.queue.sse.event.UpdateSseEvent
 import com.example.integrated.util.Loggable
 import com.example.integrated.util.isRedisConnectionException
 import com.fasterxml.jackson.databind.ObjectMapper
+import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.catch
@@ -37,7 +38,10 @@ class SseEventService(
 
         fun getSink(queueType: String): MutableSharedFlow<QueueChangePayload> {
             return sinks.computeIfAbsent(queueType) {
-                MutableSharedFlow(extraBufferCapacity = 256)
+                // 버퍼가 차면(느린 SSE 소비자) 오래된 이벤트부터 버린다.
+                // 이벤트는 상태가 아니라 재조회 트리거이므로 최신 이벤트를 남기는 쪽이 옳고,
+                // 기본 정책(SUSPEND)에서는 tryEmit이 조용히 실패해 전체 구독자가 이벤트를 잃는다.
+                MutableSharedFlow(extraBufferCapacity = 256, onBufferOverflow = BufferOverflow.DROP_OLDEST)
             }
         }
     }

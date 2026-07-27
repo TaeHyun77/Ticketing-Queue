@@ -23,7 +23,8 @@ local expireAt = tonumber(ARGV[3])
 local queueType = ARGV[4]
 
 local function emptyResult()
-    return cjson.encode({ count = 0, ids = {} })
+    -- cjson은 빈 테이블을 배열([])이 아닌 객체({})로 인코딩해 역직렬화가 실패하므로 리터럴로 반환
+    return '{"count":0,"ids":[]}'
 end
 
 -- 1. 참가열에서 만료된 사용자 정리
