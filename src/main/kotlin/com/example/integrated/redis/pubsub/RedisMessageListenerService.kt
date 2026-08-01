@@ -21,6 +21,7 @@ import org.springframework.data.redis.listener.ReactiveRedisMessageListenerConta
 import org.springframework.data.redis.serializer.RedisSerializationContext
 import org.springframework.data.redis.serializer.StringRedisSerializer
 import org.springframework.stereotype.Service
+import java.util.concurrent.atomic.AtomicLong
 
 @Service
 class RedisMessageListenerService(
@@ -29,6 +30,9 @@ class RedisMessageListenerService(
 ): Loggable {
 
     private val scope = CoroutineScope(Dispatchers.Default + SupervisorJob())
+
+    // StateFlow 동등성 conflation을 피하기 위한 이벤트 구분용 단조 시퀀스
+    private val seqCounter = AtomicLong(0)
 
     // 애플리케이션 실행 시 pub/sub channel 구독
     @PostConstruct
@@ -59,7 +63,10 @@ class RedisMessageListenerService(
                     .collect { message ->
                         runCatching {
                             val payload = objectMapper.readValue<QueueChangePayload>(message.message)
-                            SseEventService.getSink(payload.queueType).tryEmit(payload)
+                            // 절대 커서(admittedThrough)는 발행 측에서 Lua로 원자 계산해 payload에 이미 실려 있으므로
+                            // 수신 인스턴스는 재계산 없이 그대로 전달한다. StateFlow는 동등 값이면 방출을 삼키므로 단조 seq로 매 이벤트를 구분한다.
+                            SseEventService.getSink(payload.queueType).value =
+                                payload.copy(seq = seqCounter.incrementAndGet())
                         }.onFailure {
                             log.warn { "Pub/Sub 메시지 파싱 실패: ${it.message}, raw=${message.message}" }
                         }

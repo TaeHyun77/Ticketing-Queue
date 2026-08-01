@@ -12,6 +12,9 @@ const val CHANNEL_NAME = "queueing_system"
 const val ACTIVE_QUEUE_KEY = "active-allow-queue"
 const val SCHEDULING_KEY = "scheduling-key"
 
+// 큐별 누적 승격 카운터(절대 커서). 실제 키는 "queue:admitted:{queueType}", TTL 없이 영구 보존된다.
+const val ADMITTED_COUNTER_KEY_PREFIX = "queue:admitted:"
+
 inline fun <reified T> ObjectMapper.readValueFromJson(json: String): T {
     return readValue(json, T::class.java)
 }
