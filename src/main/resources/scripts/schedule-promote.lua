@@ -3,19 +3,22 @@
 -- KEYS[1] : 참가열 키 (ZSet)
 -- KEYS[2] : 대기열 키 (ZSet)
 -- KEYS[3] : 활성 큐 레지스트리 키 (active-allow-queue, Set)
+-- KEYS[4] : 누적 승격 카운터 키 (queue:admitted:{queueType}, 영구 보존)
 --
 -- ARGV[1] : 참가열 최대 수용 인원 (maxCapacity)
 -- ARGV[2] : 현재 시각 밀리초 (만료 판단용)
 -- ARGV[3] : 참가열 score (expireAt)
 -- ARGV[4] : queueType (레지스트리 멤버)
 --
--- 반환 값: { count, ids } 구조의 JSON 문자열
---   count : 승격된 사용자 수
---   ids   : 승격된 사용자 ID 배열
+-- 반환 값: { count, ids, admittedThrough } 구조의 JSON 문자열
+--   count           : 이번 tick에 승격된 사용자 수
+--   ids             : 승격된 사용자 ID 배열
+--   admittedThrough : 이 큐에서 지금까지 승격된 누적 인원(절대 커서). 클라이언트가 이 값으로 자기 순번을 갱신한다.
 
 local allowKey = KEYS[1]
 local waitKey = KEYS[2]
 local activeKey = KEYS[3]
+local admittedKey = KEYS[4]
 
 local maxCapacity = tonumber(ARGV[1])
 local nowMs = tonumber(ARGV[2])
@@ -51,4 +54,8 @@ for i = 1, #waitUsers, 2 do
     table.insert(promotedIds, waitUsers[i])
 end
 
-return cjson.encode({ count = #promotedIds, ids = promotedIds })
+-- 누적 승격 카운터를 원자적으로 올려 절대 커서를 얻는다. 승격이 실제 일어난 경우에만 증가하므로
+-- StateFlow conflation으로 중간 값이 유실돼도 최신 admittedThrough 하나면 클라이언트가 정확한 순번을 복원한다.
+local admittedThrough = redis.call('INCRBY', admittedKey, #promotedIds)
+
+return cjson.encode({ count = #promotedIds, ids = promotedIds, admittedThrough = admittedThrough })

@@ -63,6 +63,16 @@ class QueueService(
             ?.let { it + 1L }
             ?: -1L
 
+    // 누적 승격 카운터(절대 커서) 조회. init 시점 앵커(A0)로 사용하며, 아직 승격이 없었으면 0 반환
+    suspend fun getAdmittedThrough(
+        queueType: String
+    ): Long =
+        reactiveRedisTemplate.opsForValue()
+            .get("$ADMITTED_COUNTER_KEY_PREFIX$queueType")
+            .awaitFirstOrNull()
+            ?.toLongOrNull()
+            ?: 0L
+
     /* 대기열/참가열 통합 상태 조회 ( 클라이언트 상태 재동기화용 )
     * SSE 재접속 직후 현재 상태를 다시 맞추거나, failover 유실 시 클라이언트가
     * NONE을 보고 재등록을 판단하는 데 사용한다.

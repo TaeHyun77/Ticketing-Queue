@@ -3,6 +3,7 @@ package com.example.integrated.queue.queue.scheduler
 import com.example.integrated.queue.queue.dto.QueueChangePayload
 import com.example.integrated.redis.pubsub.RedisPublisher
 import com.example.integrated.util.ACTIVE_QUEUE_KEY
+import com.example.integrated.util.ADMITTED_COUNTER_KEY_PREFIX
 import com.example.integrated.util.ALLOW_QUEUE
 import com.example.integrated.util.CHANNEL_NAME
 import com.example.integrated.util.WAIT_QUEUE
@@ -57,9 +58,10 @@ class QueueSchedulerService(
         val expireAt = nowMs + tokenTtlMs
 
         val keys = listOf(
-                "$queueType$ALLOW_QUEUE",   // KEYS[1] : 참가열 키
-                "$queueType$WAIT_QUEUE",    // KEYS[2] : 대기열 키
-                ACTIVE_QUEUE_KEY            // KEYS[3] : 활성 큐 레지스트리
+                "$queueType$ALLOW_QUEUE",           // KEYS[1] : 참가열 키
+                "$queueType$WAIT_QUEUE",            // KEYS[2] : 대기열 키
+                ACTIVE_QUEUE_KEY,                   // KEYS[3] : 활성 큐 레지스트리
+                "$ADMITTED_COUNTER_KEY_PREFIX$queueType"  // KEYS[4] : 누적 승격 카운터(절대 커서)
         )
 
         val args = listOf(
@@ -80,7 +82,9 @@ class QueueSchedulerService(
                     QueueChangePayload(
                             queueType = queueType,
                             event = EVENT_PROMOTE,
-                            ids = result.ids
+                            ids = result.ids,
+                            // 누적 승격 인원(절대 커서). 발행 시점에 Lua가 원자적으로 계산한 값을 그대로 싣는다.
+                            admittedThrough = result.admittedThrough
                     )
             )
             redisPublisher.publish(CHANNEL_NAME, payload)
@@ -136,5 +140,5 @@ class QueueSchedulerService(
                 .awaitSingle()
     }
 
-    private data class PromoteResult(val count: Long, val ids: List<String>)
+    private data class PromoteResult(val count: Long, val ids: List<String>, val admittedThrough: Long = 0)
 }
