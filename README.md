@@ -102,7 +102,8 @@ Docker를 활용하여 분산 환경을 구성했으며, 각 애플리케이션 
    
    → 대기자 우선 승격 규칙을 적용하여 항상 대기열 선두 사용자가 먼저 참가열로 이동하도록 하여 해결하였습니다.<br><br>
 
-### 기능
+### 시연 영상
 ---
+[ 대기열 감소 시연 ]
 
-
+<img width="1080" height="608" alt="Image" src="https://github.com/user-attachments/assets/782d2b17-e757-4a8c-9139-08a10a1a8095" />
