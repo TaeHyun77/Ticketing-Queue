@@ -105,5 +105,4 @@ Docker를 활용하여 분산 환경을 구성했으며, 각 애플리케이션 
 ### 시연 영상
 ---
 [ 대기열 감소 시연 ]
-
 <img width="1080" height="608" alt="Image" src="https://github.com/user-attachments/assets/782d2b17-e757-4a8c-9139-08a10a1a8095" />
