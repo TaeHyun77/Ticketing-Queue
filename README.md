@@ -105,4 +105,11 @@ Docker를 활용하여 분산 환경을 구성했으며, 각 애플리케이션 
 ### 시연 영상
 ---
 [ 대기열 감소 시연 ]
-<img width="1080" height="608" alt="Image" src="https://github.com/user-attachments/assets/782d2b17-e757-4a8c-9139-08a10a1a8095" />
+<img width="1080" height="608" alt="Image" src="https://github.com/user-attachments/assets/782d2b17-e757-4a8c-9139-08a10a1a8095" /><br><br>
+
+**전체 흐름에서의 위치**
+
+본 프로젝트는 아래 전체 흐름 중 대기열 진입~참가열 승격(1~3단계)을 담당하며, 이후 좌석 조회~예약 확정(4~6단계)은 별도의 예약 프로젝트와 연계되어 동작합니다
+
+<img width="779" height="294" alt="image" src="https://github.com/user-attachments/assets/ed3bb9db-be21-43d2-8706-c9c251af532c" />
+
