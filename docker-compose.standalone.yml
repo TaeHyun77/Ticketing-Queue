@@ -1,0 +1,75 @@
+version: "2.4"
+
+services:
+  queueing:
+    build: .
+    image: local/queueing-standalone:latest
+    container_name: queueing-standalone
+    cpus: 2.0
+    mem_limit: 1.5g
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9292/actuator/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    environment:
+      - JAVA_OPTS=-Xms512m -Xmx512m -XX:+UseG1GC -XX:MaxGCPauseMillis=100
+    ports:
+      - "8081:8081"
+      - "9292:9292"
+    depends_on:
+      redis-standalone:
+        condition: service_healthy
+    networks:
+      - standalone-net
+
+  redis-standalone:
+    image: "bitnami/redis:latest"
+    hostname: redis-standalone
+    container_name: queue-redis-standalone
+    cpus: 1.0
+    mem_limit: 512m
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    environment:
+      - ALLOW_EMPTY_PASSWORD=yes
+    ports:
+      - "6380:6379"
+    networks:
+      - standalone-net
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus-standalone
+    volumes:
+      - ./prometheus.standalone.yml:/etc/prometheus/prometheus.yml
+    ports:
+      - "9090:9090"
+    depends_on:
+      - queueing
+    networks:
+      - standalone-net
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana-standalone
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    ports:
+      - "3001:3000"
+    depends_on:
+      - prometheus
+    volumes:
+      - grafana-standalone-data:/var/lib/grafana
+    networks:
+      - standalone-net
+
+networks:
+  standalone-net:
+
+volumes:
+  grafana-standalone-data:

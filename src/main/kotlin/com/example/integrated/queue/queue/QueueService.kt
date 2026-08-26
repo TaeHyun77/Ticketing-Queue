@@ -5,7 +5,7 @@ import com.example.integrated.queue.queue.dto.QueueStatus
 import com.example.integrated.queue.queue.dto.QueueStatusResponse
 import com.example.integrated.queue.queue.dto.RegisterResult
 import com.example.integrated.queue.queue.scheduler.QueueSchedulerService
-import com.example.integrated.redis.pubsub.RedisPublisher
+import com.example.integrated.queue.sse.SseEventService
 import com.example.integrated.reserveException.ErrorCode
 import com.example.integrated.reserveException.ReserveException
 import com.example.integrated.util.*
@@ -32,19 +32,16 @@ class QueueService(
         private val validationKey: String,
 
         private val queueSchedulerService: QueueSchedulerService,
-        private val redisPublisher: RedisPublisher,
         private val reactiveRedisTemplate: ReactiveRedisTemplate<String, String>,
         private val objectMapper: ObjectMapper
 ) : Loggable {
 
-    // 대기열 등록, wait/allow 진입 여부를 enum으로 반환
     suspend fun registerUserToWaitQueue(
             queueType: String,
             userId: String
     ): RegisterResult {
         val code = queueSchedulerService.enqueueOrAllow(queueType, userId)
 
-        // 활성 큐 레지스트리 등록(SADD)은 enqueue-or-allow.lua 내부에서 원자적으로 처리된다.
         return when (code) {
             -1L, -2L -> RegisterResult.ALREADY_EXISTS
             0L -> RegisterResult.REGISTERED_WAIT
@@ -52,7 +49,6 @@ class QueueService(
         }
     }
 
-    // 대기열에서의 사용자 순위 조회 ( 존재하지 않으면 -1L 반환 )
     suspend fun getWaitQueueRank(
         queueType: String,
         userId: String
@@ -63,7 +59,6 @@ class QueueService(
             ?.let { it + 1L }
             ?: -1L
 
-    // 누적 승격 카운터(절대 커서) 조회. init 시점 앵커(A0)로 사용하며, 아직 승격이 없었으면 0 반환
     suspend fun getAdmittedThrough(
         queueType: String
     ): Long =
@@ -73,11 +68,6 @@ class QueueService(
             ?.toLongOrNull()
             ?: 0L
 
-    /* 대기열/참가열 통합 상태 조회 ( 클라이언트 상태 재동기화용 )
-    * SSE 재접속 직후 현재 상태를 다시 맞추거나, failover 유실 시 클라이언트가
-    * NONE을 보고 재등록을 판단하는 데 사용한다.
-    * wait → allow 순서로 조회하므로 두 조회 사이에 승격되면 ALLOW로 판정된다.
-    * */
     suspend fun getQueueStatus(
         queueType: String,
         userId: String
@@ -94,10 +84,6 @@ class QueueService(
         return QueueStatusResponse(QueueStatus.NONE)
     }
 
-    /* Lua로 wait/allow에서 원자적으로 제거 ( race 문제 해결을 위함 )
-    * wait/allow : publish 발행 → 본인 SSE에 'cancelled' 전달
-    * none : publish 생략 → 멱등 응답으로 간주
-    * */
     suspend fun cancelUser(
         queueType: String,
         userId: String
@@ -105,21 +91,23 @@ class QueueService(
         val location = queueSchedulerService.cancelUser(queueType, userId)
         val removed = location != "none"
 
-        // 삭제가 됐다면 삭제 이벤트를 publish
         if (removed) {
-            val payload = objectMapper.writeValueAsString(
-                    QueueChangePayload(
-                            queueType = queueType,
-                            event = "cancel",
-                            ids = listOf(userId)
-                    )
+            SseEventService.emit(
+                QueueChangePayload(
+                    queueType = queueType,
+                    event = "cancel",
+                    ids = listOf(userId)
+                )
             )
-            redisPublisher.publish(CHANNEL_NAME, payload)
         }
         return removed
     }
 
-    // 참가열로 이동하면 유효성 인증을 위해 토큰을 생성하여 쿠키에 저장
+    suspend fun moveToWaitQueueTail(
+        queueType: String,
+        userId: String
+    ): Boolean = queueSchedulerService.moveToTail(queueType, userId) > 0
+
     suspend fun issueAccessTokenCookie(
             queueType: String,
             userId: String,
@@ -144,7 +132,6 @@ class QueueService(
         }
     }
 
-    // 인증을 위한 토큰 생성
     fun createAccessToken(
             queueType: String,
             userId: String
@@ -164,14 +151,12 @@ class QueueService(
         }
     }
 
-    // 타겟 페이지에 접속했을 때, 입장 가능 기간과 쿠키에 저장된 토큰의 유효성을 검증
     suspend fun isAllowTokenValid(
             queueType: String,
             userId: String,
             token: String
     ): Boolean = !(isAllowTokenExpired(queueType, userId) || isTokenMismatch(queueType, userId, token))
 
-    // 참가열에서의 사용자 TTL 만료 여부 조회, 만료 시 true 반환
     suspend fun isAllowTokenExpired(
             queueType: String,
             userId: String
@@ -188,7 +173,6 @@ class QueueService(
         return score < now
     }
 
-    // 토큰의 유효성 판별 로직, 유효하지 않다면 true 반환
     private fun isTokenMismatch(
             queueType: String,
             userId: String,

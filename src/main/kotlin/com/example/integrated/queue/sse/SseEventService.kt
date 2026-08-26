@@ -21,6 +21,7 @@ import org.springframework.http.codec.ServerSentEvent
 import org.springframework.stereotype.Service
 import java.time.Duration
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicLong
 
 @Service
 class SseEventService(
@@ -37,10 +38,18 @@ class SseEventService(
 
         private val sinks = ConcurrentHashMap<String, MutableStateFlow<QueueChangePayload>>()
 
+        // StateFlow conflation 우회용 단조 증가 시퀀스
+        private val seqCounter = AtomicLong(0)
+
         fun getSink(queueType: String): MutableStateFlow<QueueChangePayload> {
             return sinks.computeIfAbsent(queueType) {
                 MutableStateFlow(QueueChangePayload(queueType, EVENT_NONE, emptyList()))
             }
+        }
+
+        // 단일 서버에서 Pub/Sub 없이 직접 sink에 emit. seq를 채워 StateFlow conflation을 우회한다.
+        fun emit(payload: QueueChangePayload) {
+            getSink(payload.queueType).value = payload.copy(seq = seqCounter.incrementAndGet())
         }
     }
 
