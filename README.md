@@ -36,7 +36,7 @@ Docker를 활용하여 분산 환경을 구성했으며, 각 애플리케이션 
 
 **대기열 등록 과정**<br>
 
-<img width="800" height="147" alt="ㄴㄴㅇㅁ" src="https://github.com/user-attachments/assets/827c35f0-26a9-4a39-9541-e56084066d00" />
+<img width="1200" height="200" alt="ㄴㄴㅇㅁ" src="https://github.com/user-attachments/assets/827c35f0-26a9-4a39-9541-e56084066d00" />
 
 
 1. 클라이언트가 '/register'로 queueType, userId를 전송하며, 등록과 별개로 /stream에 SSE를 연결해 상태 변경을 실시간 수신합니다.
