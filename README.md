@@ -36,6 +36,9 @@ Docker를 활용하여 분산 환경을 구성했으며, 각 애플리케이션 
 
 **대기열 등록 과정**<br>
 
+<img width="2079" height="756" alt="image" src="https://github.com/user-attachments/assets/b1bb4840-303f-41d9-ae48-f45e68482e17" />
+
+
 1. 클라이언트가 '/register'로 queueType, userId를 전송하며, 등록과 별개로 /stream에 SSE를 연결해 상태 변경을 실시간 수신합니다.
 
 2. 등록은 단일 Lua 스크립트로 원자 처리됩니다. ZSCORE로 대기열/참가열 중복을 검사하고, 참가열에 여유가 있고 대기자가 없으면 참가열로 직행, 그렇지 않으면 INCR 카운터를 score로 대기열( Sorted Set )에 삽입합니다. 카운터의 단조 증가가 곧 선착순 정렬을 보장합니다.
