@@ -123,16 +123,15 @@ Docker를 활용하여 분산 환경을 구성했으며, 각 애플리케이션 
    
    → 대기자 우선 승격 규칙을 적용하여 항상 대기열 선두 사용자가 먼저 참가열로 이동하도록 하여 해결하였습니다.<br><br>
 
-### 시연 영상
----
-[ 대기열 감소 시연 ]
-<img width="1080" height="608" alt="Image" src="https://github.com/user-attachments/assets/782d2b17-e757-4a8c-9139-08a10a1a8095" /><br><br>
-
 ### 전체 흐름에서의 위치
 ---
 
 본 프로젝트는 아래 전체 흐름 중 대기열 진입-참가열 승격(1,2,3단계)을 담당하며, 이후 좌석 조회-예약 확정(4,5,6단계)은 별도의 예약 프로젝트와 연계되어 동작합니다
 
 <p align="center">
-<img width="800" height="300" alt="image" src="https://github.com/user-attachments/assets/ed3bb9db-be21-43d2-8706-c9c251af532c" />
+<img width="800" height="300" alt="image" src="https://github.com/user-attachments/assets/ed3bb9db-be21-43d2-8706-c9c251af532c" /><br><br>
 
+### 시연 영상
+---
+[ 대기열 감소 시연 ]
+<img width="1080" height="608" alt="Image" src="https://github.com/user-attachments/assets/782d2b17-e757-4a8c-9139-08a10a1a8095" />
