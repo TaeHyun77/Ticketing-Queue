@@ -54,7 +54,9 @@ Docker를 활용하여 분산 환경을 구성했으며, 각 애플리케이션 
    StateFlow는 queueType별로 분리되며, conflation으로 최신 payload만 유지합니다.
    
    - 승격된 사용자 : ZRANK 없이 confirmed 이벤트를 즉시 전송합니다.
-   - 나머지 대기자 : ZRANK 없이 누적 승격 인원(admittedThrough)만 담은 moved 이벤트를 팬아웃합니다. 클라이언트는 연결 시 init 이벤트로 수신한 앵커값(초기 순번 R0, 초기 누적 승격 인원 A0)으로 'rank = R0 - (admittedThrough - A0)'를 로컬 계산합니다. admittedThrough는 단조 증가 절대값이므로 StateFlow conflation으로 중간 이벤트가 유실되어도 최신 값 하나로 순번을 복원할 수 있습니다.
+   - 나머지 대기자 : ZRANK 없이 누적 승격 인원(admittedThrough)만 담은 moved 이벤트를 팬아웃합니다. 클라이언트는 연결 시 init 이벤트로 수신한 앵커값(초기 순번 R0, 초기 누적 승격 인원 A0)으로 'rank = R0 - (admittedThrough - A0)'를 로컬 계산합니다.
+
+     admittedThrough는 단조 증가 절대값이므로 StateFlow conflation으로 중간 이벤트가 유실되어도 최신 값 하나로 순번을 복원할 수 있습니다.
 
 4. HMAC 토큰 기반 접근 제어
 
