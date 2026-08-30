@@ -5,7 +5,7 @@ import com.example.integrated.queue.queue.dto.QueueStatus
 import com.example.integrated.queue.queue.dto.QueueStatusResponse
 import com.example.integrated.queue.queue.dto.RegisterResult
 import com.example.integrated.queue.queue.scheduler.QueueSchedulerService
-import com.example.integrated.queue.sse.SseEventService
+import com.example.integrated.redis.pubsub.RedisPublisher
 import com.example.integrated.reserveException.ErrorCode
 import com.example.integrated.reserveException.ReserveException
 import com.example.integrated.util.*
@@ -32,6 +32,7 @@ class QueueService(
         private val validationKey: String,
 
         private val queueSchedulerService: QueueSchedulerService,
+        private val redisPublisher: RedisPublisher,
         private val reactiveRedisTemplate: ReactiveRedisTemplate<String, String>,
         private val objectMapper: ObjectMapper
 ) : Loggable {
@@ -92,13 +93,14 @@ class QueueService(
         val removed = location != "none"
 
         if (removed) {
-            SseEventService.emit(
-                QueueChangePayload(
-                    queueType = queueType,
-                    event = "cancel",
-                    ids = listOf(userId)
-                )
+            val payload = objectMapper.writeValueAsString(
+                    QueueChangePayload(
+                            queueType = queueType,
+                            event = "cancel",
+                            ids = listOf(userId)
+                    )
             )
+            redisPublisher.publish(CHANNEL_NAME, payload)
         }
         return removed
     }

@@ -1,10 +1,11 @@
 package com.example.integrated.queue.queue.scheduler
 
 import com.example.integrated.queue.queue.dto.QueueChangePayload
-import com.example.integrated.queue.sse.SseEventService
+import com.example.integrated.redis.pubsub.RedisPublisher
 import com.example.integrated.util.ACTIVE_QUEUE_KEY
 import com.example.integrated.util.ADMITTED_COUNTER_KEY_PREFIX
 import com.example.integrated.util.ALLOW_QUEUE
+import com.example.integrated.util.CHANNEL_NAME
 import com.example.integrated.util.WAIT_QUEUE
 import com.example.integrated.util.Loggable
 import com.fasterxml.jackson.databind.ObjectMapper
@@ -25,6 +26,7 @@ class QueueSchedulerService(
         private val tokenTtlMs: Long,
 
         private val reactiveRedisTemplate: ReactiveRedisTemplate<String, String>,
+        private val redisPublisher: RedisPublisher,
         private val objectMapper: ObjectMapper
 ) : Loggable {
 
@@ -77,14 +79,15 @@ class QueueSchedulerService(
         val result = objectMapper.readValue<PromoteResult>(raw)
 
         if (result.count > 0) {
-            SseEventService.emit(
-                QueueChangePayload(
-                    queueType = queueType,
-                    event = EVENT_PROMOTE,
-                    ids = result.ids,
-                    admittedThrough = result.admittedThrough
-                )
+            val payload = objectMapper.writeValueAsString(
+                    QueueChangePayload(
+                            queueType = queueType,
+                            event = EVENT_PROMOTE,
+                            ids = result.ids,
+                            admittedThrough = result.admittedThrough
+                    )
             )
+            redisPublisher.publish(CHANNEL_NAME, payload)
         }
 
         return result.count

@@ -21,7 +21,6 @@ import org.springframework.http.codec.ServerSentEvent
 import org.springframework.stereotype.Service
 import java.time.Duration
 import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.atomic.AtomicLong
 
 @Service
 class SseEventService(
@@ -38,18 +37,16 @@ class SseEventService(
 
         private val sinks = ConcurrentHashMap<String, MutableStateFlow<QueueChangePayload>>()
 
-        // StateFlow conflation 우회용 단조 증가 시퀀스
-        private val seqCounter = AtomicLong(0)
-
         fun getSink(queueType: String): MutableStateFlow<QueueChangePayload> {
             return sinks.computeIfAbsent(queueType) {
                 MutableStateFlow(QueueChangePayload(queueType, EVENT_NONE, emptyList()))
             }
         }
 
-        // 단일 서버에서 Pub/Sub 없이 직접 sink에 emit. seq를 채워 StateFlow conflation을 우회한다.
+        // 승격/취소 이벤트를 sink에 반영한다. 절대 커서(admittedThrough)가 단조 증가하므로 연속 promote는
+        // 항상 서로 다른 값이 되어 conflation 억제가 발생하지 않고, 설령 유실돼도 최신 절대 커서로 순번이 복원된다.
         fun emit(payload: QueueChangePayload) {
-            getSink(payload.queueType).value = payload.copy(seq = seqCounter.incrementAndGet())
+            getSink(payload.queueType).value = payload
         }
     }
 
@@ -94,7 +91,6 @@ class SseEventService(
             }
 
             // promote 팬아웃(본인 미포함) : 구독자별 rank를 계산하지 않고 절대 커서만 전송
-            // 클라이언트가 앵커(R0, A0) 기준으로 자기 rank를 갱신하므로, 대용량 rank 맵과 구독자별 재조회가 사라져 StateFlow conflation의 O(N) equals와 GC 압력이 제거됨
             if (payload.event == EVENT_PROMOTE) {
                 return sse("moved", MovedSseEvent(payload.admittedThrough))
             }

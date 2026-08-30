@@ -77,80 +77,81 @@ services:
     networks:
       - integrated-net
 
-  # --- 예약 프로젝트 ---
-  mysql:
-    image: mysql:8.0
-    container_name: reserve-mysql
-    environment:
-      MYSQL_ROOT_PASSWORD: "0136"
-      MYSQL_DATABASE: reserve_project
-    healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    ports:
-      - "3307:3306"
-    volumes:
-      - mysql-data:/var/lib/mysql
-    networks:
-      - integrated-net
-
-  reserve-1:
-    image: ayeah77/integrated-reserve
-    container_name: reserve01
-    healthcheck:
-      test: ["CMD-SHELL", "nc -z localhost 8080 || exit 1"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    environment:
-      - JAVA_OPTS=-Xms256m -Xmx512m
-      - SPRING_DATASOURCE_URL=jdbc:mysql://reserve-mysql:3306/reserve_project?useSSL=false&useUnicode=true&serverTimezone=Asia/Seoul&allowPublicKeyRetrieval=true
-      - SPRING_DATASOURCE_USERNAME=root
-      - SPRING_DATASOURCE_PASSWORD=0136
-      - SPRING_DATA_REDIS_HOST=redis-master
-    ports:
-      - "8084:8080"
-    depends_on:
-      mysql:
-        condition: service_healthy
-      redis-sentinel01:
-        condition: service_healthy
-      redis-sentinel02:
-        condition: service_healthy
-      redis-sentinel03:
-        condition: service_healthy
-    networks:
-      - integrated-net
-
-  reserve-2:
-    image: ayeah77/integrated-reserve
-    container_name: reserve02
-    healthcheck:
-      test: ["CMD-SHELL", "nc -z localhost 8080 || exit 1"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    environment:
-      - JAVA_OPTS=-Xms256m -Xmx512m
-      - SPRING_DATASOURCE_URL=jdbc:mysql://reserve-mysql:3306/reserve_project?useSSL=false&useUnicode=true&serverTimezone=Asia/Seoul&allowPublicKeyRetrieval=true
-      - SPRING_DATASOURCE_USERNAME=root
-      - SPRING_DATASOURCE_PASSWORD=0136
-      - SPRING_DATA_REDIS_HOST=redis-master
-    ports:
-      - "8085:8080"
-    depends_on:
-      mysql:
-        condition: service_healthy
-      redis-sentinel01:
-        condition: service_healthy
-      redis-sentinel02:
-        condition: service_healthy
-      redis-sentinel03:
-        condition: service_healthy
-    networks:
-      - integrated-net
+#  mysql:
+#    image: mysql:8.0
+#    container_name: reserve-mysql
+#    environment:
+#      MYSQL_ROOT_PASSWORD: "0136"
+#      MYSQL_DATABASE: reserve_project
+#    healthcheck:
+#      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+#      interval: 10s
+#      timeout: 5s
+#      retries: 5
+#    ports:
+#      - "3307:3306"
+#    volumes:
+#      - mysql-data:/var/lib/mysql
+#    networks:
+#      - integrated-net
+#
+#  # --- 예약 프로젝트 ---
+#
+#  reserve-1:
+#    image: ayeah77/integrated-reserve
+#    container_name: reserve01
+#    healthcheck:
+#      test: ["CMD-SHELL", "nc -z localhost 8080 || exit 1"]
+#      interval: 10s
+#      timeout: 5s
+#      retries: 5
+#    environment:
+#      - JAVA_OPTS=-Xms256m -Xmx512m
+#      - SPRING_DATASOURCE_URL=jdbc:mysql://reserve-mysql:3306/reserve_project?useSSL=false&useUnicode=true&serverTimezone=Asia/Seoul&allowPublicKeyRetrieval=true
+#      - SPRING_DATASOURCE_USERNAME=root
+#      - SPRING_DATASOURCE_PASSWORD=0136
+#      - SPRING_DATA_REDIS_HOST=redis-master
+#    ports:
+#      - "8084:8080"
+#    depends_on:
+#      mysql:
+#        condition: service_healthy
+#      redis-sentinel01:
+#        condition: service_healthy
+#      redis-sentinel02:
+#        condition: service_healthy
+#      redis-sentinel03:
+#        condition: service_healthy
+#    networks:
+#      - integrated-net
+#
+#  reserve-2:
+#    image: ayeah77/integrated-reserve
+#    container_name: reserve02
+#    healthcheck:
+#      test: ["CMD-SHELL", "nc -z localhost 8080 || exit 1"]
+#      interval: 10s
+#      timeout: 5s
+#      retries: 5
+#    environment:
+#      - JAVA_OPTS=-Xms256m -Xmx512m
+#      - SPRING_DATASOURCE_URL=jdbc:mysql://reserve-mysql:3306/reserve_project?useSSL=false&useUnicode=true&serverTimezone=Asia/Seoul&allowPublicKeyRetrieval=true
+#      - SPRING_DATASOURCE_USERNAME=root
+#      - SPRING_DATASOURCE_PASSWORD=0136
+#      - SPRING_DATA_REDIS_HOST=redis-master
+#    ports:
+#      - "8085:8080"
+#    depends_on:
+#      mysql:
+#        condition: service_healthy
+#      redis-sentinel01:
+#        condition: service_healthy
+#      redis-sentinel02:
+#        condition: service_healthy
+#      redis-sentinel03:
+#        condition: service_healthy
+#    networks:
+#      - integrated-net
 
   # --- Nginx ---
   nginx:
@@ -167,10 +168,10 @@ services:
         condition: service_healthy
       queueing-back-3:
         condition: service_healthy
-      reserve-1:
-        condition: service_healthy
-      reserve-2:
-        condition: service_healthy
+#      reserve-1:
+#        condition: service_healthy
+#      reserve-2:
+#        condition: service_healthy
     networks:
       - integrated-net
 

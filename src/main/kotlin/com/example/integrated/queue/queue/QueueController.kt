@@ -66,4 +66,11 @@ class QueueController (
         @RequestBody request: QueueRequest,
     ): Boolean =
         queueService.cancelUser(request.queueType, request.userId)
+
+    // 새로고침 시 대기열 순번을 맨 뒤로 밀기 ( 대기열에 없으면 false, no-op )
+    @PostMapping("/move-to-tail")
+    suspend fun moveToTail(
+        @RequestBody request: QueueRequest,
+    ): Boolean =
+        queueService.moveToWaitQueueTail(request.queueType, request.userId)
 }
